@@ -8,7 +8,7 @@ import (
 	"github.com/fatih/color"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"path"
 	"strings"
 )
 
@@ -68,8 +68,12 @@ func main() {
 }
 
 func runMigrationCheck(dir, customBuildCommand string) error {
-	// 1. Create temporary CodeQL database
-	dbPath := filepath.Join(os.TempDir(), "cosmos-migration-db")
+	dbPath, err := os.MkdirTemp(os.TempDir(), "cosmos-migration-db")
+
+	if err != nil {
+		return err
+	}
+
 	defer os.RemoveAll(dbPath)
 
 	command := []string{
@@ -89,33 +93,28 @@ func runMigrationCheck(dir, customBuildCommand string) error {
 
 	fmt.Println(command)
 
-	// 2. Initialize database
 	cmd := exec.Command(command[0], command[1:]...)
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
 		return err
 	}
 
-	// 3. Run analysis
 	results, err := runAnalysis(dbPath)
 	if err != nil {
 		return err
 	}
 
-	// 4. Print findings in a user-friendly format
 	return printFindings(results)
 }
 
 func runAnalysis(dbPath string) (*Sarif, error) {
 	// Run CodeQL analysis with your custom pack
+	resultsPath := path.Join(dbPath, "results.json")
 	cmd := exec.Command("codeql", "database", "analyze",
 		"--format=sarif-latest",
-		"--output=results.json",
+		fmt.Sprintf("--output=%s", resultsPath),
 		dbPath,
-		"/Users/magelinskasz/skip/cosmos-52-ql")
+		"skip-mev/cosmos-52-ql")
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -124,12 +123,8 @@ func runAnalysis(dbPath string) (*Sarif, error) {
 		return nil, fmt.Errorf("analysis failed: %w", err)
 	}
 
-	//if err := cmd.Wait(); err != nil {
-	//	return nil, fmt.Errorf("analysis failed: %w", err)
-	//}
-
 	// Parse results
-	data, err := os.ReadFile("results.json")
+	data, err := os.ReadFile(resultsPath)
 	if err != nil {
 		return nil, err
 	}
