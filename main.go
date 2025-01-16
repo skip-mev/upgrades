@@ -116,9 +116,6 @@ func runAnalysis(dbPath string) (*Sarif, error) {
 		dbPath,
 		"skip-mev/cosmos-52-ql")
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("analysis failed: %w", err)
 	}
